@@ -22,9 +22,11 @@ void die(const char *s) {
   exit(1);
 }
 
+inline char addCtrl(char c) { return c & 0x1f; }
+
 void disableRawMode() {
- if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &originalTermios) == -1)
-   die("tcsetattr");
+  if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &originalTermios) == -1)
+    die("tcsetattr");
 }
 
 void enableRawMode() {
@@ -77,8 +79,25 @@ void initControlLookup() {
   controlLookup[127] = "delete";
 }
 
-inline char addCtrl(char c) {
-  return c & 0x1f;
+char editorReadKey() {
+  int numberRead;
+  char c;
+  while ((numberRead = read(STDIN_FILENO, &c, 1)) != 1) {
+    if (numberRead == -1 && errno != EAGAIN)
+      die("read");
+  }
+
+  return c;
+}
+
+void editorProcessKeypress() {
+  char c = editorReadKey();
+
+  switch (c) {
+  case addCtrl('q'):
+    exit(0);
+    break;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -90,28 +109,7 @@ int main(int argc, char **argv) {
   initControlLookup();
 
   while (true) {
-    char c = 0;
-    int result = read(STDIN_FILENO, &c, 1);
-    if (result == -1) {
-      if (errno != EAGAIN)
-        die("read");
-      else
-        continue;
-    }
-    if (c == 0)
-      continue;
-
-    if (iscntrl(c)) {
-      auto val = controlLookup[c];
-      if (val != 0)
-        printf("%d ('%s')\r\n", c, controlLookup[c]);
-      else
-        printf("%d\r\n", c);
-    } else
-      printf("%d ('%c')\r\n", c, c);
-
-    if (c == addCtrl('q'))
-      break;
+    editorProcessKeypress();
   }
 
   return 0;
