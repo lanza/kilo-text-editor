@@ -77,6 +77,10 @@ void initControlLookup() {
   controlLookup[127] = "delete";
 }
 
+inline char addCtrl(char c) {
+  return c & 0x1f;
+}
+
 int main(int argc, char **argv) {
   if (!llvm::cl::ParseCommandLineOptions(argc, argv)) {
     llvm::cl::PrintOptionValues();
@@ -102,7 +106,7 @@ int main(int argc, char **argv) {
     else
       printf("%d ('%c')\r\n", c, c);
 
-    if (c == 'q')
+    if (c == addCtrl('q'))
       break;
   }
 
