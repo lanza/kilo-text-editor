@@ -101,9 +101,13 @@ int main(int argc, char **argv) {
     if (c == 0)
       continue;
 
-    if (iscntrl(c))
-      printf("%d ('%s')\r\n", c, controlLookup[c]);
-    else
+    if (iscntrl(c)) {
+      auto val = controlLookup[c];
+      if (val != 0)
+        printf("%d ('%s')\r\n", c, controlLookup[c]);
+      else
+        printf("%d\r\n", c);
+    } else
       printf("%d ('%c')\r\n", c, c);
 
     if (c == addCtrl('q'))
