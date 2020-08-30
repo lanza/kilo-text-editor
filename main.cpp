@@ -353,12 +353,29 @@ void editorProcessKeypress() {
   }
 }
 
+#define CTRL_KEY(k) ((k) & 0x1f)
+
+void doEchoLoop() {
+  while (true) {
+    char c = '\0';
+    read(STDIN_FILENO, &c, 1);
+    if (c == '\0')
+      continue;
+    if (iscntrl(c))
+      printf("%d\r\n", c);
+    else
+      printf("%d ('%c')\r\n", c, c);
+    if (c == CTRL_KEY('q')) break;
+  }
+}
+
 int main(int argc, char **argv) {
   if (!llvm::cl::ParseCommandLineOptions(argc, argv)) {
     llvm::cl::PrintOptionValues();
   }
 
   enableRawMode();
+
   initEditor();
   initControlLookup();
 
