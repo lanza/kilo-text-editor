@@ -183,7 +183,7 @@ void enableRawMode() {
   // --- IFLAGS ---
   // This uses ctrl-s and ctrl-q to control input and output for old days
   raw.c_iflag &= ~(IXON);
-  // This flag swaps CR to NL
+  // This flag stops the terminal from  mapping CTRL-M to CTRL-J
   raw.c_iflag &= ~(ICRNL);
 
   // --- LFLAGS ---
