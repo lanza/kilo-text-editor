@@ -308,13 +308,18 @@ void editorRefreshScreen() {
   write(STDOUT_FILENO, ab.buffer, ab.length);
 }
 
+const char* ClearScreen = "\x1b[2J";
+const char* MoveCursorHome = "\x1b[H";
+
 void editorProcessKeypress() {
   int c = editorReadKey();
 
   switch (c) {
   case addCtrl('q'):
-    write(STDOUT_FILENO, "\x1b[2J", 4);
-    write(STDOUT_FILENO, "\x1b[H", 3);
+    // clears the screen
+    write(STDOUT_FILENO, ClearScreen, 4);
+    // move cursor to home. wikipedia says clear screen already does this
+    write(STDOUT_FILENO, MoveCursorHome, 3);
     exit(0);
     break;
   case Key::Home:
