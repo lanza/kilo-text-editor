@@ -36,9 +36,11 @@ llvm::cl::opt<bool> MuffinIsCool("muffin-is-cool",
 llvm::cl::opt<bool> DoLoop("loop", llvm::cl::desc("Do the loop."),
                            llvm::cl::init(false));
 
+inline constexpr char addCtrl(char c) { return c & 0x1f; }
+
 static llvm::cl::opt<std::string> InputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<filename>"),
-                                                llvm::cl::init("-"));
+                                                llvm::cl::init(""));
 
 struct Row {
   int size;
@@ -380,6 +382,8 @@ void editorOpen(char const *filename) {
   E.dirty = 0;
 }
 
+void editorRefreshScreen();
+
 void editorSetStatusMessage(char const *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
@@ -388,9 +392,49 @@ void editorSetStatusMessage(char const *fmt, ...) {
   E.statusmsg_time = time(nullptr);
 }
 
+char *editorPrompt(char *prompt) {
+  size_t bufsize = 128;
+  char *buf = static_cast<char *>(malloc(bufsize));
+
+  size_t buflen = 0;
+  buf[0] = '\0';
+
+  while (true) {
+    editorSetStatusMessage(prompt, buf);
+    editorRefreshScreen();
+
+    int c = editorReadKey();
+    if (c == Key::Delete || c == addCtrl('h') || c == Key::BackSpace) {
+      if (buflen != 0)
+        buf[--buflen] = '\0';
+    } else if (c == '\x1b') {
+      editorSetStatusMessage("");
+      free(buf);
+      return nullptr;
+    } else if (c == '\r') {
+      if (buflen != 0) {
+        editorSetStatusMessage("");
+        return buf;
+      }
+    } else if (!iscntrl(c) && c < 128) {
+      if (buflen == bufsize - 1) {
+        bufsize *= 2;
+        buf = static_cast<char *>(realloc(buf, bufsize));
+      }
+      buf[buflen++] = c;
+      buf[buflen] = '\0';
+    }
+  }
+}
+
 void editorSave() {
-  if (E.filename == nullptr)
-    return;
+  if (E.filename == nullptr) {
+    E.filename = editorPrompt(const_cast<char *>("Save as: %s"));
+    if (E.filename == nullptr) {
+      editorSetStatusMessage("Save aborted");
+      return;
+    }
+  }
 
   int len;
   char *buf = editorRowsToString(&len);
@@ -431,8 +475,6 @@ void initEditor() {
   // for the status line
   E.screenRows -= 2;
 }
-
-inline constexpr char addCtrl(char c) { return c & 0x1f; }
 
 void disableRawMode() {
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.originalTermios) == -1)
@@ -779,7 +821,8 @@ int main(int argc, char **argv) {
     doEchoLoop();
 
   initEditor();
-  editorOpen(InputFilename.c_str());
+  if (InputFilename.size() > 0)
+    editorOpen(InputFilename.c_str());
 
   editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit");
   initControlLookup();
