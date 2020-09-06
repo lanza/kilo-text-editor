@@ -555,6 +555,12 @@ void editorMoveCursor(int key) {
   Row *row = (E.cursorY >= E.numRows) ? nullptr : &E.row[E.cursorY];
 
   switch (key) {
+  case Key::End:
+    E.cursorX = E.row[E.cursorY].size;
+    break;
+  case Key::Home:
+    E.cursorX = 0;
+    break;
   case Key::ArrowLeft:
     if (E.cursorX != 0)
       --E.cursorX;
@@ -730,8 +736,12 @@ void editorProcessKeypress() {
     editorSave();
     break;
   case addCtrl('e'):
-  case addCtrl('k'):
+    editorMoveCursor(Key::End);
+    break;
   case addCtrl('a'):
+    editorMoveCursor(Key::Home);
+    break;
+  case addCtrl('k'):
   case addCtrl('l'):
   case '\x1b':
     break;
