@@ -392,7 +392,7 @@ void editorSetStatusMessage(char const *fmt, ...) {
   E.statusmsg_time = time(nullptr);
 }
 
-char *editorPrompt(char *prompt) {
+char *editorPrompt(char *prompt, void (*callback)(char *, int) = nullptr) {
   size_t bufsize = 128;
   char *buf = static_cast<char *>(malloc(bufsize));
 
@@ -409,11 +409,15 @@ char *editorPrompt(char *prompt) {
         buf[--buflen] = '\0';
     } else if (c == '\x1b') {
       editorSetStatusMessage("");
+      if (callback)
+        callback(buf, c);
       free(buf);
       return nullptr;
     } else if (c == '\r') {
       if (buflen != 0) {
         editorSetStatusMessage("");
+        if (callback)
+          callback(buf, c);
         return buf;
       }
     } else if (!iscntrl(c) && c < 128) {
@@ -423,6 +427,51 @@ char *editorPrompt(char *prompt) {
       }
       buf[buflen++] = c;
       buf[buflen] = '\0';
+    }
+    if (callback)
+      callback(buf, c);
+  }
+}
+
+int editorRowRxToCx(Row *row, int renderX);
+
+void editorFindCallback(char *query, int key) {
+  static int last_match = -1;
+  static int direction = 1;
+
+  if (key == '\r' || key == '\x1b') {
+    last_match = -1;
+    direction = 1;
+    return;
+  } else if (key == Key::ArrowRight || key == Key::ArrowDown) {
+    direction = 1;
+  } else if (key == Key::ArrowLeft || key == ArrowUp) {
+    direction = -1;
+  } else {
+    last_match = -1;
+    direction = 1;
+  }
+
+  if (last_match == -1)
+    direction = 1;
+
+  int current = last_match;
+
+  for (int i = 0; i < E.numRows; ++i) {
+    current += direction;
+    if (current == -1)
+      current = E.numRows - 1;
+    else if (current == E.numRows)
+      current = 0;
+
+    Row *row = &E.row[current];
+    char *match = strstr(row->render, query);
+    if (match) {
+      last_match = current;
+      E.cursorY = current;
+      E.cursorX = editorRowRxToCx(row, match - row->render);
+      E.rowOffset = E.numRows;
+      break;
     }
   }
 }
@@ -642,6 +691,40 @@ int editorRowCxToRx(Row *row, int cursorX) {
   return renderX;
 }
 
+int editorRowRxToCx(Row *row, int renderX) {
+  int curRx = 0;
+  int cx;
+  for (cx = 0; cx < row->size; ++cx) {
+    if (row->chars[cx] == '\t')
+      curRx += (TabSize - 1) - (curRx % TabSize);
+    ++curRx;
+
+    if (curRx > renderX)
+      return cx;
+  }
+  return cx;
+}
+
+void editorFind() {
+  int saved_cx = E.cursorX;
+  int saved_cy = E.cursorY;
+  int saved_coloff = E.colOffset;
+  int saved_rowoff = E.rowOffset;
+
+  char *query =
+      editorPrompt(const_cast<char *>("Search: %s (Use ESC/Arrows/Enter)"),
+                   editorFindCallback);
+
+  if (query)
+    free(query);
+  else {
+    E.cursorX = saved_cx;
+    E.cursorY = saved_cy;
+    E.colOffset = saved_coloff;
+    E.rowOffset = saved_rowoff;
+  }
+}
+
 void editorScroll() {
   E.renderX = E.cursorX;
   if (E.cursorY < E.numRows)
@@ -724,6 +807,10 @@ void editorProcessKeypress() {
   switch (c) {
   case '\r':
     editorInsertNewLine();
+    break;
+  case addCtrl(31):
+    editorFind();
+    ;
     break;
   case Key::BackSpace:
   case addCtrl('h'):
@@ -827,6 +914,8 @@ int main(int argc, char **argv) {
 
   enableRawMode();
 
+  doEchoLoop();
+
   if (DoLoop)
     doEchoLoop();
 
@@ -834,7 +923,7 @@ int main(int argc, char **argv) {
   if (InputFilename.size() > 0)
     editorOpen(InputFilename.c_str());
 
-  editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit");
+  editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-/ = find");
   initControlLookup();
 
   while (true) {
