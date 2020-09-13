@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
-set(CMAKE_CXX_COMPILER $ENV{PROJECTS}/llvm-project/build/Release/bin/clang++)
-set(CMAKE_C_COMPILER $ENV{PROJECTS}/llvm-project/build/Release/bin/clang)
+set(CMAKE_CXX_COMPILER /Users/lanza/.llvm/bin/clang++)
+set(CMAKE_C_COMPILER /Users/lanza/.llvm/bin/clang)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 11)
 
-project(main CXX C Swift OBJC)
+project(main CXX C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -21,10 +21,6 @@ set(LLVM_DIR ~/.llvm/lib/cmake/llvm)
 find_package(LLVM REQUIRED)
 find_package(ZLIB REQUIRED)
 include_directories(${LLVM_INCLUDE_DIRS})
-
-find_package(glog REQUIRED)
-set(GFLAGS_USE_TARGET_NAMESPACE ON)
-find_package(gflags REQUIRED)
 
 include_directories(include)
 add_subdirectory(include)
@@ -45,8 +41,6 @@ function(exec name)
     LLVMSupport
     LLVMCore
     dbg_macro
-    glog::glog
-    gflags::gflags_shared
     Person
     Utility
   )
@@ -54,11 +48,3 @@ function(exec name)
 endfunction()
 
 exec(main)
-
-add_executable(objc objc.m)
-
-find_library(FOUNDATION Foundation)
-target_link_libraries(
-  objc
-  PUBLIC ${FOUNDATION}
-)

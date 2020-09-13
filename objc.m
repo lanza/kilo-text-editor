@@ -9,10 +9,16 @@
 
 @implementation Person
 - (void) printName {
-  NSLog(@"%@", self.name);
+  NSLog(@"%@ is 32", self.name);
 }
 @end
 
 int main() {
+  int i = 4;
+  printf("%d\n", i);
+  for (int j = 0; j < 10; ++j) {
+    printf("%d\n", j);
+  }
 
+  return i;
 }
