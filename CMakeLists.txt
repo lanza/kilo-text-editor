@@ -47,4 +47,4 @@ function(exec name)
   target_compile_options(${name} PUBLIC -fno-rtti)
 endfunction()
 
-exec(main)
+exec(kilo)

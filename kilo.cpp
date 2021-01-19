@@ -53,6 +53,19 @@ char const *MakeCursorInvisible = "\x1b[?25l";
 char const *MakeCursorVisible = "\x1b[?25h";
 char const *PleaseReportActivePosition = "\x1b[6n";
 char const *ClearRow = "\x1b[K";
+std::string moveCursorUp(int n) { return "\x1b[" + std::to_string(n) + "A"; }
+std::string moveCursorDown(int n) { return "\x1b[" + std::to_string(n) + "B"; }
+std::string moveCursorRight(int n) { return "\x1b[" + std::to_string(n) + "C"; }
+std::string moveCursorLeft(int n) { return "\x1b[" + std::to_string(n) + "D"; }
+char const *DefaultForegroundColor = "\x1b[39m";
+std::string setColor_m(int n) { return "\x1b[" + std::to_string(n) + "m"; }
+char const *ResetColor = "\x1b[m";
+char const *ColorFormatString = "\x1b[%dm";
+char const *ReverseVideo = "\x1b[7m";
+char const *EraseLine = "\x1b[K";
+std::string setCursorPosition(int x, int y) {
+  return "\x1b[" + std::to_string(x) + ';' + std::to_string(y) + 'H';
+}
 
 static llvm::cl::OptionCategory MuffinCategory("muffin");
 llvm::cl::opt<bool> MuffinIsCool("muffin-is-cool",
@@ -233,7 +246,8 @@ int getWindowSize(int *rows, int *cols) {
   struct winsize ws;
 
   if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-    if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12)
+    auto move = moveCursorLeft(999) + moveCursorDown(999);
+    if (write(STDOUT_FILENO, move.c_str(), 12) != 12)
       return -1;
     return getCursorPosition(rows, cols);
   } else {
@@ -299,7 +313,6 @@ void editorUpdateSyntax(Row *row) {
         in_comment = 1;
         continue;
       }
-
     }
 
     if (E.syntax->flags & HL_HIGHLIGHT_STRINGS) {
@@ -924,17 +937,18 @@ void editorDrawRows(AppendBuffer &ab) {
       for (int j = 0; j < len; ++j) {
         if (iscntrl(c[j])) {
           char sym = (c[j] <= 26) ? '@' + c[j] : '?';
-          ab.append("\x1b[7m", 4);
+          ab.append(ReverseVideo, 4);
           ab.append(&sym, 1);
-          ab.append("\x1b[m", 3);
+          ab.append(ResetColor, 3);
           if (current_color != -1) {
             char buf[16];
-            int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", current_color);
+            int clen =
+                snprintf(buf, sizeof(buf), ColorFormatString, current_color);
             ab.append(buf, clen);
           }
         } else if (hl[j] == Highlight::Normal) {
           if (current_color != -1) {
-            ab.append("\x1b[39m", 5);
+            ab.append(DefaultForegroundColor, 5);
             current_color = -1;
           }
           ab.append(&c[j], 1);
@@ -943,13 +957,13 @@ void editorDrawRows(AppendBuffer &ab) {
           if (color != current_color) {
             current_color = color;
             char buf[16];
-            int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", color);
+            int clen = snprintf(buf, sizeof(buf), ColorFormatString, color);
             ab.append(buf, clen);
           }
           ab.append(&c[j], 1);
         }
       }
-      ab.append("\x1b[39m", 5);
+      ab.append(DefaultForegroundColor, 5);
     }
 
     ab.append(ClearRow, 3);
@@ -1020,7 +1034,7 @@ void editorScroll() {
 }
 
 void editorDrawStatusBar(AppendBuffer &ab) {
-  ab.append("\x1b[7m", 4);
+  ab.append(ReverseVideo, 4);
   char status[80];
   char rstatus[80];
   int len = snprintf(status, sizeof(status), "%.20s - %d lines %s",
@@ -1043,12 +1057,12 @@ void editorDrawStatusBar(AppendBuffer &ab) {
       ++len;
     }
   }
-  ab.append("\x1b[m", 3);
+  ab.append(ResetColor, 3);
   ab.append("\r\n", 2);
 }
 
 void editorDrawMessageBar(AppendBuffer &ab) {
-  ab.append("\x1b[K", 3);
+  ab.append(EraseLine, 3);
   int msglen = strlen(E.statusmsg);
   if (msglen > E.screenCols)
     msglen = E.screenCols;
@@ -1067,10 +1081,9 @@ void editorRefreshScreen() {
   editorDrawStatusBar(ab);
   editorDrawMessageBar(ab);
 
-  char buffer[32];
-  snprintf(buffer, sizeof(buffer), "\x1b[%d;%dH", (E.cursorY - E.rowOffset) + 1,
-           (E.renderX - E.colOffset) + 1);
-  ab.append(buffer, strlen(buffer));
+  auto cursorMove = setCursorPosition((E.cursorY - E.rowOffset) + 1,
+                                      (E.renderX - E.colOffset) + 1);
+  ab.append(cursorMove.c_str(), cursorMove.size());
 
   ab.append(MakeCursorVisible, 6);
 
